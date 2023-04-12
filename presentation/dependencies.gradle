@@ -1,0 +1,32 @@
+ext{
+    kotlin_version = '1.7.10'
+    ktx_version= '1.7.0'
+    koin_version = "3.2.1"
+    viewModel_version = '2.5.1'
+    coroutine_version = '1.6.1'
+    appcompat_version= '1.5.1'
+    material_version= '1.6.1'
+    constraintLayout_version= '2.1.4'
+    retrofit_version = "2.9.0"
+    okhttpLogging_interceptor_version = '4.8.1'
+    cardview_version = '1.0.0'
+    recyclerview_version = '1.2.1'
+
+    deps =[
+            kotlin            : "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version",
+            ktx               : "androidx.core:core-ktx:$ktx_version",
+            koin              : "io.insert-koin:koin-core:$koin_version",
+            koinAndroid       : "io.insert-koin:koin-android:$koin_version",
+            koinViewmodel     : "org.koin:koin-androidx-viewmodel:$koin_version",
+            coroutine         : "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutine_version",
+            appcompat         : "androidx.appcompat:appcompat:$appcompat_version",
+            material          : "com.google.android.material:material:$material_version",
+            viewModel         : "androidx.lifecycle:lifecycle-viewmodel-ktx:$viewModel_version",
+            constraintLayout  : "androidx.constraintlayout:constraintlayout:$constraintLayout_version",
+            retrofit          : "com.squareup.retrofit2:retrofit:$retrofit_version",
+            gsonConverter     : "com.squareup.retrofit2:converter-gson:$retrofit_version",
+            interceptor       : "com.squareup.okhttp3:logging-interceptor:$okhttpLogging_interceptor_version",
+            cardview          : "androidx.cardview:cardview:$cardview_version",
+            recyclerview      : "androidx.recyclerview:recyclerview:$recyclerview_version",
+    ]
+}

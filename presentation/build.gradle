@@ -1,0 +1,91 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'androidx.navigation.safeargs.kotlin'
+    id 'kotlin-kapt'
+}
+
+android {
+    namespace 'com.example.weatherapp'
+    compileSdk 33
+
+    defaultConfig {
+        minSdk 24
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        multiDexEnabled true
+
+        Properties properties = new Properties()
+        properties.load(project.rootProject.file("local.properties").newDataInputStream())
+        buildConfigField 'String', 'BASE_URL', properties.getProperty("BASE_URL", "")
+        buildConfigField "String", "OPEN_WEATHER_API_KEY", properties.getProperty("OPEN_WEATHER_API_KEY", "")
+
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    dataBinding {
+        enabled = true
+    }
+}
+
+dependencies {
+    implementation project(':domain')
+    implementation project(':data')
+    implementation project(':core')
+
+    implementation 'androidx.core:core-ktx:1.7.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.8.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    //UI
+    implementation deps.cardview
+    implementation deps.recyclerview
+
+    //ViewModel
+    implementation deps.viewModel
+
+    //KOIN
+    implementation deps.koin
+    testImplementation "io.insert-koin:koin-test:3.2.1"
+    // Koin main features for Android
+    implementation deps.koinAndroid
+
+    //Coroutines
+    implementation deps.coroutine
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4"
+
+    //Retrofit
+    implementation deps.retrofit
+    implementation deps.gsonConverter
+
+    implementation deps.interceptor
+
+    implementation 'com.android.support:multidex:1.0.3'
+
+    // Navigation Components
+    implementation "androidx.navigation:navigation-fragment-ktx:2.6.0-alpha09"
+    implementation "androidx.navigation:navigation-ui-ktx:2.6.0-alpha09"
+
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+
+}
