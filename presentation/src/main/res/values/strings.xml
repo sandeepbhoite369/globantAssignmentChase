@@ -18,4 +18,10 @@
     <string name="weather_type">Drizzle</string>
     <string name="sunrise">Sunrise</string>
     <string name="sunset">Sunset</string>
+
+    <string name="text_location_permission_needed">Location permission needed</string>
+    <string name="text_location_permission_needed_desc">This app needs the Location permission, please accept to use location functionality</string>
+    <string name="text_ok">Ok</string>
+    <string name="text_permission_denied">Permission denied</string>
+    <string name="text_granted_background_location_permission">Granted background location permission</string>
 </resources>

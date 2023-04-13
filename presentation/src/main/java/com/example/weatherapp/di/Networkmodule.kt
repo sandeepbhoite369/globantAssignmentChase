@@ -1,6 +1,5 @@
 package com.example.weatherapp.di
 
-import com.example.weatherapp.BuildConfig
 import com.example.data.source.remote.ApiService
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -10,10 +9,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 private const val TIME_OUT = 30L
+private const val BASE_URL="http://api.openweathermap.org/"
 
 val NetwokModule = module {
     single { createOkhttpClient() }
-    single { createRetrofit(get(), BuildConfig.BASE_URL) }
+    single { createRetrofit(get(), BASE_URL) }
     single { createApiService(get()) }
 }
 

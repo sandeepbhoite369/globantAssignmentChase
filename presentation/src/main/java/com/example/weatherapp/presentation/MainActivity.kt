@@ -1,15 +1,17 @@
 package com.example.weatherapp.presentation
 
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -17,15 +19,14 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.databinding.DataBindingUtil
 import com.example.domain.model.CurrentWeatherData
-import com.example.weatherapp.BuildConfig
 import com.example.weatherapp.R
 import com.example.weatherapp.databinding.ActivityMainBinding
 import com.example.weatherapp.presentation.searchlocation.SearchLocationViewModel
 import com.example.weatherapp.utils.Status
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
@@ -36,72 +37,73 @@ import kotlin.math.roundToInt
 
 @RequiresApi(Build.VERSION_CODES.O)
 class MainActivity : AppCompatActivity() {
-
-    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var binding: ActivityMainBinding
     private val viewModel: SearchLocationViewModel by viewModel()
+    private var fusedLocationProvider: FusedLocationProviderClient? = null
+    private var isLocationDetected = false
+    private lateinit var sharedPref: SharedPreferences
+    private lateinit var editor: SharedPreferences.Editor
+    private var lastCityName: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         supportActionBar?.hide()
-        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
-        binding.clMainLayout.visibility = View.GONE
+        sharedPref = getSharedPreferences(SHARED_PREFERANCE, Context.MODE_PRIVATE)
+        editor = sharedPref.edit()
+        checkLocationPermission(this)
+    }
 
-        getCurrentLocation()
+    override fun onResume() {
+        super.onResume()
+        isLocationDetected = false
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationProvider?.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        }
+        lastCityName = sharedPref.getString(LAST_CITY_NAME, null)
+        lastCityName?.let {
+            getCityWeather(it)
+        }
         getCityName()
     }
 
-    /*This function is to get latitude and langitude for first time */
-    private fun getCurrentLocation() {
-        if (checkPermission()) {
-            if (isLocationEnable()) {
-
-                if (ActivityCompat.checkSelfPermission(
-                        this, android.Manifest.permission.ACCESS_FINE_LOCATION
-                    ) != PackageManager.PERMISSION_GRANTED &&
-                    ActivityCompat.checkSelfPermission(
-                        this, android.Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    requestPermission()
-                    return
+    private var locationCallback: LocationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            val locationList = locationResult.locations
+            if (locationList.isNotEmpty()) {
+                //The last location in the list is the newest
+                val location = locationList.last()
+                if (location != null && !isLocationDetected) {
+                    fetchCurrentLocationWeather(
+                        location.latitude.toString(),
+                        location.longitude.toString()
+                    )
+                    isLocationDetected = true
                 }
-                fusedLocationProviderClient.lastLocation.addOnCompleteListener(this) { task ->
-                    val location: Location? = task.result
-                    if (location == null) {
-                        Toast.makeText(this, "NULL  ", Toast.LENGTH_LONG).show()
-                    } else {
-                        // On successful lat and long fetch data for current location
-                        fetchCurrentLocationWeather(
-                            location.latitude.toString(),
-                            location.longitude.toString()
-                        )
-                    }
-                }
-
-            } else {
-                //setting Open here
-                Toast.makeText(this, "Turn On Location..", Toast.LENGTH_LONG).show()
-                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                startActivity(intent)
             }
-        } else {
-            // Request permission here
-            requestPermission()
         }
     }
 
     private fun getCityName() {
-        binding.etGetCityName.setOnEditorActionListener{ v, actionId, keyEvent ->
+        binding.etGetCityName.setOnEditorActionListener { v, actionId, keyEvent ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
+                editor.apply {
+                    putString(LAST_CITY_NAME, binding.etGetCityName.text.toString())
+                    apply()
+                }
                 getCityWeather(binding.etGetCityName.text.toString())
                 val view = this.currentFocus
                 if (view != null) {
                     val imm: InputMethodManager =
                         getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
                     imm.hideSoftInputFromWindow(view.windowToken, 0)
-                    binding.etGetCityName.clearFocus()
+                  //  binding.etGetCityName.clearFocus()
                 }
                 true
             } else false
@@ -112,7 +114,7 @@ class MainActivity : AppCompatActivity() {
     private fun getCityWeather(cityName: String) {
         binding.progressBar.visibility = View.VISIBLE
         subscribeToObserver()
-        viewModel.getCityWeather(cityName, BuildConfig.OPEN_WEATHER_API_KEY)
+        viewModel.getCityWeather(cityName, OPEN_WEATHER_API_KEY)
     }
 
     private fun fetchCurrentLocationWeather(latitude: String, longitude: String) {
@@ -121,7 +123,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.getCurrentWeatherData(
             latitude.toDouble(),
             longitude.toDouble(),
-            BuildConfig.OPEN_WEATHER_API_KEY
+            OPEN_WEATHER_API_KEY
         )
     }
 
@@ -150,7 +152,7 @@ class MainActivity : AppCompatActivity() {
             val currentDate = sdf.format(Date())
             tvDateAndTime.text = currentDate
 
-           tvDayMaxTemp.text =
+            tvDayMaxTemp.text =
                 "Day " + data.main?.temp_max?.let { kalvinToCelcius(it) } + "°"
             tvDayMinTemp.text =
                 "Day " + data.main?.temp_min?.let { kalvinToCelcius(it) } + "°"
@@ -184,61 +186,110 @@ class MainActivity : AppCompatActivity() {
         return intTemp.toBigDecimal().setScale(NEW_SCALE, RoundingMode.UP).toDouble()
     }
 
-    private fun requestPermission() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(
-                android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                android.Manifest.permission.ACCESS_FINE_LOCATION
-            ),
-            PERMISSION_REQUEST_ACCESS_LOCATION
-        )
-    }
-
-    private fun isLocationEnable(): Boolean {
-        val locationManager: LocationManager =
-            getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(
-            LocationManager.NETWORK_PROVIDER
-        )
-    }
-
-    private fun checkPermission(): Boolean {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(
-                this,
-                android.Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            return true
-        } else {
-            return false
-        }
-    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
-        permissions: Array<out String>,
+        permissions: Array<String>,
         grantResults: IntArray
     ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_ACCESS_LOCATION) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Permission Granted..", Toast.LENGTH_LONG).show()
-                getCurrentLocation()
-            } else {
-                Toast.makeText(this, "Permission Denied..", Toast.LENGTH_LONG).show()
+        when (requestCode) {
+            MY_PERMISSIONS_REQUEST_LOCATION -> {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted, yay! Do the
+                    // location-related task you need to do.
+                    if (ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        fusedLocationProvider?.requestLocationUpdates(
+                            locationRequest,
+                            locationCallback,
+                            Looper.getMainLooper()
+                        )
+                        // Now check background location
+                        checkBackgroundLocation(this@MainActivity)
+                    }
+
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(
+                        this,
+                        "permission_denied",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    // Check if we are in a state where the user has denied the permission and
+                    // selected Don't ask again
+                    if (!ActivityCompat.shouldShowRequestPermissionRationale(
+                            this,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        )
+                    ) {
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts("package", this.packageName, null),
+                            ),
+                        )
+                    }
+                }
+                return super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            }
+            MY_PERMISSIONS_REQUEST_BACKGROUND_LOCATION -> {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // location-related task you need to do.
+                    if (ContextCompat.checkSelfPermission(
+                            this,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        fusedLocationProvider?.requestLocationUpdates(
+                            locationRequest,
+                            locationCallback,
+                            Looper.getMainLooper()
+                        )
+
+                        Toast.makeText(
+                            this, getString(R.string.text_granted_background_location_permission),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Toast.makeText(
+                        this,
+                        getString(R.string.text_permission_denied),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                return
             }
         }
     }
 
+    val locationRequest =
+        LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL)
+            .setWaitForAccurateLocation(false)
+            .setMinUpdateIntervalMillis(LOCATION_FASTEST_INTERVAL)
+            .setMaxUpdateDelayMillis(LOCATION_MAX_WAIT_TIME)
+            .build()
+
     companion object {
-        private const val PERMISSION_REQUEST_ACCESS_LOCATION = 100
+        private const val OPEN_WEATHER_API_KEY = "ed73305365a0d4d64cd534a24846c812"
         private const val DATE_FORMAT = "dd/MM/yyyy hh:mm"
         private const val NEW_SCALE = 1
         private const val NEW_TEMP = 273
+        const val MY_PERMISSIONS_REQUEST_LOCATION = 99
+        const val MY_PERMISSIONS_REQUEST_BACKGROUND_LOCATION = 66
+        private const val LOCATION_INTERVAL = 30000L
+        private const val LOCATION_FASTEST_INTERVAL = 50L
+        private const val LOCATION_MAX_WAIT_TIME = 100L
+        private const val SHARED_PREFERANCE = "myPreferance"
+        private const val LAST_CITY_NAME = "lastCityName"
     }
 }
